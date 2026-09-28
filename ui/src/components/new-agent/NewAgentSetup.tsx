@@ -49,6 +49,10 @@ import {
   storeOrganizationApiKey,
 } from "@/lib/provider-credential";
 import { defaultCreateValues } from "../agent-config-defaults";
+import {
+  createValuesForAdapterType,
+  resolveNewAgentDefaultAdapterType,
+} from "@/lib/new-agent-create-values";
 import { ModelDropdown } from "../AgentConfigForm";
 import { Field, ToggleField } from "../agent-config-primitives";
 import { SecretPicker } from "../environment-variables-editor/SecretPicker";
@@ -141,7 +145,12 @@ function Setup({
   const [screen, setScreen] = useState<"connect" | "runtime" | "saved">(
     createdAgentId ? "saved" : connectionAdapter ? "connect" : "runtime",
   );
-  const [model, setModel] = useState("");
+  const [model, setModel] = useState(
+    () =>
+      createValuesForAdapterType(
+        resolveNewAgentDefaultAdapterType({ presetAdapterType: adapterType }),
+      ).model,
+  );
   const efforts = isRunner ? [] : setupEfforts(adapterType, model);
   const [effort, setEffort] = useState("");
   const [modelOpen, setModelOpen] = useState(false);
@@ -204,6 +213,10 @@ function Setup({
   const agents = useQuery({
     queryKey: queryKeys.agents.list(companyId),
     queryFn: () => agentsApi.list(companyId),
+  });
+  const initialAdapter = resolveNewAgentDefaultAdapterType({
+    companyAgents: agents.data,
+    presetAdapterType: adapterType,
   });
   const envs = useQuery({
     queryKey: queryKeys.environments.list(companyId),
@@ -593,7 +606,7 @@ function Setup({
     return (
       <AgentBasicsDialog
         open
-        initialAdapter={adapterType}
+        initialAdapter={initialAdapter}
         onClose={() => navigate("/agents/all")}
         onContinue={(basics) =>
           navigate(`/agents/new?${new URLSearchParams(basics)}`, {

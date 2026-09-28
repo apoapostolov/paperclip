@@ -2,7 +2,8 @@ import { useCompany } from "@/context/CompanyContext";
 import { useAgentAppearanceDraft } from "@/hooks/useAgentAppearanceDraft";
 import { AdapterMark } from "../AdapterMark";
 import { AgentCharacter } from "../AgentCharacter";
-import { useId, useState } from "react";
+import { useId, useEffect, useRef, useState } from "react";
+import { resolveNewAgentAdapterSelection } from "@/lib/new-agent-create-values";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, Check, ChevronRight } from "lucide-react";
 import { adaptersApi } from "@/api/adapters";
@@ -57,6 +58,16 @@ export function AgentBasicsDialog({
   });
   const [name, setName] = useState("");
   const [adapterType, setAdapterType] = useState(initialAdapter);
+  const adapterSelectionMade = useRef(false);
+  useEffect(() => {
+    setAdapterType((currentAdapterType) =>
+      resolveNewAgentAdapterSelection({
+        currentAdapterType,
+        nextDefaultAdapterType: initialAdapter,
+        userSelectedAdapter: adapterSelectionMade.current,
+      }),
+    );
+  }, [initialAdapter]);
   const [runnerProvider, setRunnerProvider] = useState("codex");
   const [step, setStep] = useState<"name" | "adapter">("name");
   const {
@@ -188,7 +199,10 @@ export function AgentBasicsDialog({
                           name="new-agent-adapter"
                           value={adapter.type}
                           checked={adapterType === adapter.type}
-                          onChange={() => setAdapterType(adapter.type)}
+                          onChange={() => {
+                            adapterSelectionMade.current = true;
+                            setAdapterType(adapter.type);
+                          }}
                           className="peer sr-only"
                         />
                         <span

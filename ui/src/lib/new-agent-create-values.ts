@@ -46,6 +46,16 @@ export function resolveNewAgentDefaultAdapterType(input?: {
   return defaultCreateValues.adapterType;
 }
 
+export function resolveNewAgentAdapterSelection(input: {
+  currentAdapterType: string;
+  nextDefaultAdapterType: string;
+  userSelectedAdapter: boolean;
+}) {
+  return input.userSelectedAdapter
+    ? input.currentAdapterType
+    : input.nextDefaultAdapterType;
+}
+
 export function buildNewAgentDefaultCreateValues(input?: {
   companyAgents?: Pick<Agent, "adapterType" | "role">[] | null;
   presetAdapterType?: string | null;

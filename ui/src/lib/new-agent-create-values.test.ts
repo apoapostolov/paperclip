@@ -5,6 +5,7 @@ import {
   buildNewAgentDefaultCreateValues,
   createValuesForAdapterType,
   resolveNewAgentDefaultAdapterType,
+  resolveNewAgentAdapterSelection,
 } from "./new-agent-create-values";
 
 describe("new agent create values", () => {
@@ -37,6 +38,26 @@ describe("new agent create values", () => {
     expect(values.adapterType).toBe("pi_local");
     expect(values.model).toBe("");
     expect(values.dangerouslyBypassSandbox).toBe(defaultCreateValues.dangerouslyBypassSandbox);
+  });
+
+  it("updates the inherited adapter until the user changes it", () => {
+    expect(
+      resolveNewAgentAdapterSelection({
+        currentAdapterType: "codex_local",
+        nextDefaultAdapterType: "pi_local",
+        userSelectedAdapter: false,
+      }),
+    ).toBe("pi_local");
+  });
+
+  it("preserves an adapter the user explicitly selected", () => {
+    expect(
+      resolveNewAgentAdapterSelection({
+        currentAdapterType: "codex_local",
+        nextDefaultAdapterType: "pi_local",
+        userSelectedAdapter: true,
+      }),
+    ).toBe("codex_local");
   });
 
   it("builds new-agent defaults from the CEO adapter type", () => {
