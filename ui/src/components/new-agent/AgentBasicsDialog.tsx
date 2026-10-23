@@ -13,7 +13,7 @@ import { adaptersApi } from "@/api/adapters";
 import { instanceSettingsApi } from "@/api/instanceSettings";
 import { useCloudInstance } from "@/hooks/useCloudInstance";
 import { isNewAgentAdapterAllowed } from "@/lib/new-agent-adapters";
-import { resolveNewAgentDefaultAdapterType } from "@/lib/new-agent-create-values";
+import { resolveNewAgentDefaultAdapterType, resolveNewAgentDefaultRunnerProvider, NEW_AGENT_RUNNER_PROVIDERS } from "@/lib/new-agent-create-values";
 import { queryKeys } from "@/lib/queryKeys";
 import { getAdapterDisplay } from "@/adapters/adapter-display-registry";
 import { cn } from "@/lib/utils";
@@ -80,7 +80,7 @@ export function AgentBasicsDialog({
   const [name, setName] = useState(initialName);
   const [adapterType, setAdapterType] = useState(initialAdapter);
   const adapterTouchedRef = useRef(Boolean(initialAdapter));
-  const [runnerProvider, setRunnerProvider] = useState("codex");
+  const [runnerProvider, setRunnerProvider] = useState<string>(NEW_AGENT_RUNNER_PROVIDERS[0].value);
   const [step, setStep] = useState<"name" | "adapter">(setupAgentId ? "adapter" : "name");
   const {
     data: adapters,
@@ -116,8 +116,10 @@ export function AgentBasicsDialog({
   ), ...(copilotAvailable ? [{ ...nativeRunner!, type: "copilot_runtime" }] : [])];
   const experimentalRunnerAvailable = experimental.data?.enableNativeRunner === true
     && adapters?.some(adapter => adapter.type === "paperclip_runner" && adapter.loaded && !adapter.disabled);
-  const validAdapter = choices.some((adapter) => adapter.type === adapterType)
-    || (experimentalRunnerAvailable && adapterType === "paperclip_runner");
+  const runnerProviderOffered = NEW_AGENT_RUNNER_PROVIDERS.some(option => option.value === runnerProvider);
+  const validAdapter = (choices.some((adapter) => adapter.type === adapterType)
+    || (experimentalRunnerAvailable && adapterType === "paperclip_runner"))
+    && (adapterType !== "paperclip_runner" || runnerProviderOffered);
 
   useEffect(() => {
     if (!open) return;
@@ -131,6 +133,14 @@ export function AgentBasicsDialog({
       || (experimentalRunnerAvailable && defaultAdapterType === "paperclip_runner");
     if (!defaultAvailable) return;
     setAdapterType((current) => (current === defaultAdapterType ? current : defaultAdapterType));
+    if (defaultAdapterType !== "paperclip_runner") return;
+    // The inherited adapter needs its harness too, or the picker shows an empty
+    // selection and submit would save a provider the harness list never offers.
+    const defaultRunnerProvider = resolveNewAgentDefaultRunnerProvider({
+      companyAgents: agents.data,
+      allowedProviders: NEW_AGENT_RUNNER_PROVIDERS.map(option => option.value),
+    });
+    setRunnerProvider((current) => (current === defaultRunnerProvider ? current : defaultRunnerProvider));
   }, [open, initialAdapter, agents.data, defaultAdapterType, choices, experimentalRunnerAvailable]);
   async function submit() {
     if (busy.current || !name.trim() || (step === "adapter" && !validAdapter)) return;
@@ -161,7 +171,14 @@ export function AgentBasicsDialog({
       }
       saved.current = agent;
       const nextAdapter = ["openai_dot", "copilot_runtime"].includes(adapterType) ? "paperclip_runner" : adapterType;
-      const nextProvider = adapterType === "copilot_runtime" ? "copilot" : adapterType === "openai_dot" ? "openai_dot" : adapterType === "paperclip_runner" ? runnerProvider : "codex";
+      // A `paperclip_runner` submission always carries a harness the picker offers.
+      const resolvedRunnerProvider = runnerProviderOffered
+        ? runnerProvider
+        : resolveNewAgentDefaultRunnerProvider({
+            companyAgents: agents.data ?? null,
+            allowedProviders: NEW_AGENT_RUNNER_PROVIDERS.map(option => option.value),
+          });
+      const nextProvider = adapterType === "copilot_runtime" ? "copilot" : adapterType === "openai_dot" ? "openai_dot" : adapterType === "paperclip_runner" ? resolvedRunnerProvider : "codex";
       if (step === "adapter" || (!creatingRecord && agent.name !== name.trim())) {
         agent = await agentsApi.update(agent.id, {
           name: name.trim(),
@@ -333,10 +350,7 @@ export function AgentBasicsDialog({
                         setRunnerProvider(provider);
                         setAdapterType("paperclip_runner");
                       }}
-                      options={[
-                        { value: "grok", label: "Grok Build (Paperclip Runner)" },
-                        { value: "opencode", label: "OpenCode (Paperclip Runner)" },
-                      ]} />
+                      options={NEW_AGENT_RUNNER_PROVIDERS} />
                   </div>
                 </details>}
               </fieldset>
